@@ -12,6 +12,14 @@ const (
 	Tencent
 	Gemini
 	Ollama
+	AwsClaude
+	Coze
+	Cohere
+	Cloudflare
+	DeepL
+	VertexAI
+	Proxy
+	Replicate
 
 	Dummy // this one is only for count, do not add any channel after this
 )

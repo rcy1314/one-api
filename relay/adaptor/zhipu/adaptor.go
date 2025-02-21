@@ -4,13 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
 	"github.com/songquanpeng/one-api/relay/relaymode"
 	"io"
-	"math"
 	"net/http"
 	"strings"
 )
@@ -62,16 +62,16 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	}
 	switch relayMode {
 	case relaymode.Embeddings:
-		baiduEmbeddingRequest := ConvertEmbeddingRequest(*request)
-		return baiduEmbeddingRequest, nil
+		baiduEmbeddingRequest, err := ConvertEmbeddingRequest(*request)
+		return baiduEmbeddingRequest, err
 	default:
-		// TopP (0.0, 1.0)
-		request.TopP = math.Min(0.99, request.TopP)
-		request.TopP = math.Max(0.01, request.TopP)
+		// TopP [0.0, 1.0]
+		request.TopP = helper.Float64PtrMax(request.TopP, 1)
+		request.TopP = helper.Float64PtrMin(request.TopP, 0)
 
-		// Temperature (0.0, 1.0)
-		request.Temperature = math.Min(0.99, request.Temperature)
-		request.Temperature = math.Max(0.01, request.Temperature)
+		// Temperature [0.0, 1.0]
+		request.Temperature = helper.Float64PtrMax(request.Temperature, 1)
+		request.Temperature = helper.Float64PtrMin(request.Temperature, 0)
 		a.SetVersionByModeName(request.Model)
 		if a.APIVersion == "v4" {
 			return request, nil
@@ -129,11 +129,15 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 	return
 }
 
-func ConvertEmbeddingRequest(request model.GeneralOpenAIRequest) *EmbeddingRequest {
-	return &EmbeddingRequest{
-		Model: "embedding-2",
-		Input: request.Input.(string),
+func ConvertEmbeddingRequest(request model.GeneralOpenAIRequest) (*EmbeddingRequest, error) {
+	inputs := request.ParseInput()
+	if len(inputs) != 1 {
+		return nil, errors.New("invalid input length, zhipu only support one input")
 	}
+	return &EmbeddingRequest{
+		Model: request.Model,
+		Input: inputs[0],
+	}, nil
 }
 
 func (a *Adaptor) GetModelList() []string {
